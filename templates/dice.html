@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dice Game</title>
+</head>
+<body>
+    <h1>Dice Game</h1>
+
+    <p>Turn: {{ game.turn }}</p>
+    <p>Point: {{ game.point if game.point else 'not set' }}</p>
+    <p>Game over? {{ game.game_over }}</p>
+
+    <p><strong>{{ game.message }}</strong></p>
+
+    <form method="post">
+        <input type="number" name="roll" min="2" max="12" required>
+        <button type="submit" name="roll" value="1">Roll</button>
+    </form>
+
+    <form method="post">
+        <button type="submit" name="new_game" value="1">New Game</button>
+    </form>
+</body>
+</html>
