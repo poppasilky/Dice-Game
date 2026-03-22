@@ -2,41 +2,100 @@
 <html>
 <head>
     <title>Dice Game</title>
-<style>
-    body
-    {
-    background-color: black;
-    color: purple;    
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    margin: 0;
-}
-</style>
+    <style>
+        body {
+            background-color: #111;
+            color: #ddd;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #222;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .game-status {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        button, input {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .leaderboard {
+            background: #333;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .win {
+            color: #4caf50;
+        }
+        .lose {
+            color: #f44336;
+        }
+        .flash {
+            background: #ff9800;
+            color: #000;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Dice Game</h1>
+    <div class="container">
+        <h1>🎲 Dice Game 🎲</h1>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="game-status">
+            <h2>Game Status</h2>
+            <p><strong>Turn:</strong> {{ game.turn }}</p>
+            <p><strong>Point:</strong> {{ game.point if game.point else 'not set' }}</p>
+            <p><strong>Game over?</strong> {{ game.game_over }}</p>
+            <p><strong>{{ game.message }}</strong></p>
+            {% if game.rolls %}
+                <p><strong>Roll history:</strong> {{ game.rolls | join(', ') }}</p>
+            {% endif %}
+        </div>
 
-    <p>Welcome! Enter a roll or click Random Roll to start.</p>
-    <p>Turn: {{ game.turn }}</p>
-    <p>Point: {{ game.point if game.point else 'not set' }}</p>
-    <p>Game over? {{ game.game_over }}</p>
+        <form method="post">
+            <input type="number" name="roll" min="2" max="12" placeholder="Enter roll (2-12)">
+            <button type="submit" name="roll" value="submit">Roll</button>
+        </form>
+        <form method="post">
+            <button type="submit" name="roll" value="random">Random Roll</button>
+        </form>
+        <form method="post">
+            <button type="submit" name="new_game" value="1">New Game</button>
+        </form>
 
-    <p><strong>{{ game.message }}</strong></p>
-
-    <form method="post">
-        <input type="number" name="roll" min="2" max="12" required>
-        <button type="submit" name="roll" value="1">Roll</button>
-    </form>
-
-    <form method="post">
-        <button type="submit" name="random" value="1">Random Roll</button>
-    </form>
-
-    <form method="post">
-        <button type="submit" name="new_game" value="1">New Game</button>
-    </form>
+        {% if leaderboard %}
+        <div class="leaderboard">
+            <h3>Leaderboard (last 10 games)</h3>
+            <ul>
+                {% for entry in leaderboard %}
+                    <li class="{{ entry.result }}">{{ entry.timestamp }} – {{ entry.result }}</li>
+                {% endfor %}
+            </ul>
+            <a href="{{ url_for('clear_leaderboard') }}">Clear Leaderboard</a>
+        </div>
+        {% endif %}
+    </div>
 </body>
 </html>
