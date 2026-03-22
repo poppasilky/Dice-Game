@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dice Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1e3c72;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: rgba(0,0,0,0.7);
+            border-radius: 20px;
+            padding: 20px;
+        }
+        .panels {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .panel {
+            background: #333;
+            border-radius: 10px;
+            padding: 15px;
+            width: 250px;
+        }
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+        }
+        .turn-points {
+            font-size: 18px;
+            margin: 5px;
+        }
+        .dice {
+            font-size: 60px;
+            background: white;
+            color: black;
+            width: 80px;
+            height: 80px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            margin: 5px;
+        }
+        .mode-selector {
+            margin: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            margin: 10px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .message {
+            background: #444;
+            padding: 10px;
+            margin-top: 20px;
+        }
+        @keyframes roll {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .rolling {
+            animation: roll 0.3s linear;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🎲 Dice Duel</h1>
+
+    <div class="mode-selector">
+        <label>Game Mode:</label>
+        <select id="modeSelect">
+            <option value="pig_single">Pig (Single Die)</option>
+            <option value="pig_two">Pig (Two Dice)</option>
+            <option value="craps">Craps</option>
+        </select>
+        <button id="applyModeBtn">Apply & New Game</button>
+    </div>
+
+    <div class="panels">
+        <div class="panel">
+            <h2>You</h2>
+            <div class="score" id="playerScore">0</div>
+            <div class="turn-points">Turn points: <span id="roundPoints">0</span></div>
+            <div>
+                <span class="dice" id="playerDie1">⚀</span>
+                <span class="dice" id="playerDie2">⚀</span>
+            </div>
+        </div>
+        <div class="panel">
+            <h2>Ghost</h2>
+            <div class="score" id="ghostScore">0</div>
+            <div class="turn-points">Turn points: <span id="ghostRoundPoints">0</span></div>
+            <div>
+                <span class="dice" id="ghostDie1">⚀</span>
+                <span class="dice" id="ghostDie2">⚀</span>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <button id="rollBtn">🎲 Roll</button>
+        <button id="holdBtn">✋ Hold</button>
+        <button id="newBtn">🔄 New Game</button>
+    </div>
+
+    <div class="message" id="message">Click Roll to start</div>
+</div>
+
+<script>
+    let currentMode = 'pig_single';
+    let ghostInterval = null;
+
+    function getDiceFace(value) {
+        const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+        return faces[value-1] || '⚀';
+    }
+
+    async function updateUI(state) {
+        document.getElementById('playerScore').textContent = state.player_score;
+        document.getElementById('ghostScore').textContent = state.ghost_score;
+        document.getElementById('roundPoints').textContent = state.round_points;
+        document.getElementById('ghostRoundPoints').textContent = state.ghost_round_points;
+        document.getElementById('message').textContent = state.message;
+
+        const pDie1 = document.getElementById('playerDie1');
+        const pDie2 = document.getElementById('playerDie2');
+        pDie1.textContent = getDiceFace(state.player_dice1);
+        pDie2.textContent = getDiceFace(state.player_dice2);
+
+        const gDie1 = document.getElementById('ghostDie1');
+        const gDie2 = document.getElementById('ghostDie2');
+        gDie1.textContent = getDiceFace(state.ghost_dice1);
+        gDie2.textContent = getDiceFace(state.ghost_dice2);
+    }
+
+    async function animateDice(element, value) {
+        element.textContent = getDiceFace(value);
+        element.classList.add('rolling');
+        setTimeout(() => element.classList.remove('rolling'), 300);
+    }
+
+    async function playerAction(endpoint) {
+        if (ghostInterval) clearInterval(ghostInterval);
+        const rollBtn = document.getElementById('rollBtn');
+        const holdBtn = document.getElementById('holdBtn');
+        rollBtn.disabled = true;
+        holdBtn.disabled = true;
+
+        const res = await fetch(endpoint, { method: 'POST' });
+        const state = await res.json();
+
+        // Animate player dice
+        await animateDice(document.getElementById('playerDie1'), state.player_dice1);
+        if (state.mode === 'pig_two') {
+            await animateDice(document.getElementById('playerDie2'), state.player_dice2);
+        }
+
+        await updateUI(state);
+
+        if (state.game_over) {
+            rollBtn.disabled = false;
+            holdBtn.disabled = false;
+            return;
+        }
+
+        if (state.turn === 'ghost') {
+            startGhostTurn();
+        } else {
+            rollBtn.disabled = false;
+            holdBtn.disabled = false;
+        }
+    }
+
+    async function startGhostTurn() {
+        const rollBtn = document.getElementById('rollBtn');
+        const holdBtn = document.getElementById('holdBtn');
+        rollBtn.disabled = true;
+        holdBtn.disabled = true;
+
+        if (ghostInterval) clearInterval(ghostInterval);
+        ghostInterval = setInterval(async () => {
+            const res = await fetch('/api/ghost_roll', { method: 'POST' });
+            const state = await res.json();
+
+            // Animate ghost dice
+            await animateDice(document.getElementById('ghostDie1'), state.ghost_dice1);
+            if (state.mode === 'pig_two') {
+                await animateDice(document.getElementById('ghostDie2'), state.ghost_dice2);
+            }
+            await updateUI(state);
+
+            if (state.game_over || state.turn === 'player') {
+                clearInterval(ghostInterval);
+                ghostInterval = null;
+                if (!state.game_over) {
+                    rollBtn.disabled = false;
+                    holdBtn.disabled = false;
+                }
+            }
+        }, 1000); // 1 second between ghost rolls
+    }
+
+    async function roll() {
+        playerAction('/api/roll');
+    }
+
+    async function hold() {
+        playerAction('/api/hold');
+    }
+
+    async function newGame() {
+        if (ghostInterval) clearInterval(ghostInterval);
+        const mode = document.getElementById('modeSelect').value;
+        const res = await fetch('/api/new', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: mode })
+        });
+        const state = await res.json();
+        await updateUI(state);
+        document.getElementById('rollBtn').disabled = false;
+        document.getElementById('holdBtn').disabled = false;
+    }
+
+    document.getElementById('rollBtn').addEventListener('click', roll);
+    document.getElementById('holdBtn').addEventListener('click', hold);
+    document.getElementById('newBtn').addEventListener('click', newGame);
+    document.getElementById('applyModeBtn').addEventListener('click', newGame);
+
+    // Initial load
+    fetch('/api/status').then(r => r.json()).then(s => updateUI(s));
+</script>
+</body>
+</html>
