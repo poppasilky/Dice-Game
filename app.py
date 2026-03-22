@@ -29,7 +29,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 player_name TEXT,
                 player_score INTEGER,
-                computer_score INTEGER,
+                ghost_score INTEGER,
                 winner TEXT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -40,9 +40,9 @@ def init_db():
 def new_game():
     return {
         'player_score': 0,
-        'computer_score': 0,
+        'ghost_score': 0,
         'current_roll': 0,
-        'turn': 'player',  # 'player' or 'computer'
+        'turn': 'player',  # 'player' or 'ghost'
         'round_points': 0,
         'game_over': False,
         'message': 'Roll the dice to start!'
@@ -55,7 +55,7 @@ def player_roll(state):
     if state['game_over']:
         return state
     if state['turn'] != 'player':
-        state['message'] = "It's the computer's turn."
+        state['message'] = "It's the ghost's turn."
         return state
 
     roll = roll_dice()
@@ -63,8 +63,8 @@ def player_roll(state):
 
     if roll == 1:
         state['round_points'] = 0
-        state['turn'] = 'computer'
-        state['message'] = f'You rolled a 1! No points added. Computer\'s turn.'
+        state['turn'] = 'ghost'
+        state['message'] = f'You rolled a 1! No points added. Ghost\'s turn.'
     else:
         state['round_points'] += roll
         state['message'] = f'You rolled a {roll}. You have {state["round_points"]} points this turn.'
@@ -75,44 +75,44 @@ def player_hold(state):
     if state['game_over']:
         return state
     if state['turn'] != 'player':
-        state['message'] = "It's the computer's turn."
+        state['message'] = "It's the ghost's turn."
         return state
 
     state['player_score'] += state['round_points']
     state['round_points'] = 0
-    state['turn'] = 'computer'
-    state['message'] = f'You hold with {state["player_score"]} points. Computer\'s turn.'
+    state['turn'] = 'ghost'
+    state['message'] = f'You hold with {state["player_score"]} points. Ghost\'s turn.'
     return state
 
-def computer_turn(state):
+def ghost_turn(state):
     if state['game_over']:
         return state
-    if state['turn'] != 'computer':
+    if state['turn'] != 'ghost':
         return state
 
     # Simple AI: roll until at least 20 points or risk a 1
-    while state['turn'] == 'computer' and not state['game_over']:
+    while state['turn'] == 'ghost' and not state['game_over']:
         roll = roll_dice()
         if roll == 1:
             state['round_points'] = 0
             state['turn'] = 'player'
-            state['message'] = 'Computer rolled a 1! No points added. Your turn.'
+            state['message'] = 'Ghost rolled a 1! No points added. Your turn.'
             break
         else:
             state['round_points'] += roll
-            # If computer reaches 20 or more this turn, hold
-            if state['computer_score'] + state['round_points'] >= 100:
-                state['computer_score'] += state['round_points']
+            # If ghost reaches 20 or more this turn, hold
+            if state['ghost_score'] + state['round_points'] >= 100:
+                state['ghost_score'] += state['round_points']
                 state['round_points'] = 0
                 state['game_over'] = True
-                state['winner'] = 'computer'
-                state['message'] = f'Computer rolled and reached 100 points! Computer wins!'
+                state['winner'] = 'ghost'
+                state['message'] = f'Ghost rolled and reached 100 points! Ghost wins!'
                 break
             elif state['round_points'] >= 20:
-                state['computer_score'] += state['round_points']
+                state['ghost_score'] += state['round_points']
                 state['round_points'] = 0
                 state['turn'] = 'player'
-                state['message'] = f'Computer holds with {state["computer_score"]} points. Your turn.'
+                state['message'] = f'Ghost holds with {state["ghost_score"]} points. Your turn.'
                 break
     return state
 
@@ -122,23 +122,23 @@ def check_winner(state):
         state['winner'] = 'player'
         state['message'] = 'You reached 100 points! You win!'
         # Save to database
-        save_game_result('Player', state['player_score'], state['computer_score'], 'player')
-    elif state['computer_score'] >= 100:
+        save_game_result('Player', state['player_score'], state['ghost_score'], 'player')
+    elif state['ghost_score'] >= 100:
         state['game_over'] = True
-        state['winner'] = 'computer'
-        state['message'] = 'Computer reached 100 points! Computer wins!'
-        save_game_result('Player', state['player_score'], state['computer_score'], 'computer')
+        state['winner'] = 'ghost'
+        state['message'] = 'Ghost reached 100 points! Ghost wins!'
+        save_game_result('Player', state['player_score'], state['ghost_score'], 'ghost')
     return state
 
-def save_game_result(player_name, player_score, computer_score, winner):
+def save_game_result(player_name, player_score, ghost_score, winner):
     db = get_db()
-    db.execute('INSERT INTO games (player_name, player_score, computer_score, winner) VALUES (?, ?, ?, ?)',
-               (player_name, player_score, computer_score, winner))
+    db.execute('INSERT INTO games (player_name, player_score, ghost_score, winner) VALUES (?, ?, ?, ?)',
+               (player_name, player_score, ghost_score, winner))
     db.commit()
 
 def get_leaderboard():
     db = get_db()
-    cur = db.execute('SELECT player_name, player_score, computer_score, winner, timestamp FROM games ORDER BY timestamp DESC LIMIT 10')
+    cur = db.execute('SELECT player_name, player_score, ghost_score, winner, timestamp FROM games ORDER BY timestamp DESC LIMIT 10')
     return cur.fetchall()
 
 # ----- Flask Routes -----
@@ -158,12 +158,10 @@ def api_roll():
     state = session['game']
     if state['turn'] == 'player':
         state = player_roll(state)
-        # After player roll, check if game over
         state = check_winner(state)
         session['game'] = state
-        # If game still active and it's computer's turn, run computer turn
-        if not state['game_over'] and state['turn'] == 'computer':
-            state = computer_turn(state)
+        if not state['game_over'] and state['turn'] == 'ghost':
+            state = ghost_turn(state)
             state = check_winner(state)
             session['game'] = state
         return jsonify(state)
@@ -179,8 +177,8 @@ def api_hold():
         state = player_hold(state)
         state = check_winner(state)
         session['game'] = state
-        if not state['game_over'] and state['turn'] == 'computer':
-            state = computer_turn(state)
+        if not state['game_over'] and state['turn'] == 'ghost':
+            state = ghost_turn(state)
             state = check_winner(state)
             session['game'] = state
         return jsonify(state)
