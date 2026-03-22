@@ -1,101 +1,254 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dice Game</title>
+    <title>Dice Game – Player vs Computer</title>
     <style>
         body {
-            background-color: #111;
-            color: #ddd;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: #fff;
             text-align: center;
             margin: 0;
             padding: 20px;
         }
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: auto;
-            background: #222;
+            background: rgba(0,0,0,0.7);
+            border-radius: 20px;
             padding: 20px;
-            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
-        .game-status {
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .score-card {
             background: #333;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
+            padding: 20px;
+            border-radius: 15px;
+            width: 200px;
         }
-        button, input {
-            padding: 10px 20px;
-            margin: 5px;
-            font-size: 16px;
+        .score-card h2 {
+            margin: 0 0 10px;
+        }
+        .score-card .score {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .current-roll {
+            font-size: 80px;
+            margin: 20px;
+            background: #fff;
+            color: #000;
+            display: inline-block;
+            padding: 20px;
+            border-radius: 20px;
+            width: 120px;
+            height: 120px;
+            line-height: 120px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .controls {
+            margin: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 18px;
+            margin: 10px;
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        .roll-btn {
+            background-color: #4caf50;
+            color: white;
+        }
+        .hold-btn {
+            background-color: #ff9800;
+            color: white;
+        }
+        .new-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .message {
+            font-size: 18px;
+            margin: 20px;
+            padding: 10px;
+            background: #444;
+            border-radius: 8px;
         }
         .leaderboard {
-            background: #333;
+            margin-top: 30px;
+            background: #222;
+            border-radius: 10px;
             padding: 10px;
-            border-radius: 8px;
-            margin-top: 20px;
         }
-        .win {
+        .leaderboard table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .leaderboard th, .leaderboard td {
+            padding: 8px;
+            border-bottom: 1px solid #444;
+        }
+        .turn-indicator {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 10px;
+        }
+        .player-turn {
             color: #4caf50;
         }
-        .lose {
-            color: #f44336;
+        .computer-turn {
+            color: #ff9800;
         }
-        .flash {
-            background: #ff9800;
-            color: #000;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 5px;
+        @keyframes roll {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .rolling {
+            animation: roll 0.3s linear;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎲 Dice Game 🎲</h1>
-        
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="flash">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        <div class="game-status">
-            <h2>Game Status</h2>
-            <p><strong>Turn:</strong> {{ game.turn }}</p>
-            <p><strong>Point:</strong> {{ game.point if game.point else 'not set' }}</p>
-            <p><strong>Game over?</strong> {{ game.game_over }}</p>
-            <p><strong>{{ game.message }}</strong></p>
-            {% if game.rolls %}
-                <p><strong>Roll history:</strong> {{ game.rolls | join(', ') }}</p>
-            {% endif %}
-        </div>
+<div class="container">
+    <h1>🎲 Dice Duel: Player vs Computer 🖥️</h1>
+    <p>First to 100 points wins! Roll the dice, but avoid a 1 or you lose your turn points.</p>
 
-        <form method="post">
-            <input type="number" name="roll" min="2" max="12" placeholder="Enter roll (2-12)">
-            <button type="submit" name="roll" value="submit">Roll</button>
-        </form>
-        <form method="post">
-            <button type="submit" name="roll" value="random">Random Roll</button>
-        </form>
-        <form method="post">
-            <button type="submit" name="new_game" value="1">New Game</button>
-        </form>
-
-        {% if leaderboard %}
-        <div class="leaderboard">
-            <h3>Leaderboard (last 10 games)</h3>
-            <ul>
-                {% for entry in leaderboard %}
-                    <li class="{{ entry.result }}">{{ entry.timestamp }} – {{ entry.result }}</li>
-                {% endfor %}
-            </ul>
-            <a href="{{ url_for('clear_leaderboard') }}">Clear Leaderboard</a>
+    <div class="scoreboard">
+        <div class="score-card">
+            <h2>👤 You</h2>
+            <div class="score" id="playerScore">0</div>
+            <div>Turn points: <span id="roundPoints">0</span></div>
         </div>
-        {% endif %}
+        <div class="score-card">
+            <h2>🤖 Computer</h2>
+            <div class="score" id="computerScore">0</div>
+        </div>
     </div>
+
+    <div class="current-roll" id="diceDisplay">🎲</div>
+
+    <div class="turn-indicator" id="turnIndicator">Your turn</div>
+
+    <div class="controls">
+        <button class="roll-btn" id="rollBtn">🎲 Roll</button>
+        <button class="hold-btn" id="holdBtn">✋ Hold</button>
+        <button class="new-btn" id="newGameBtn">🔄 New Game</button>
+    </div>
+
+    <div class="message" id="message">Click Roll to start!</div>
+
+    <div class="leaderboard">
+        <h3>🏆 Leaderboard (Last 10 Games)</h3>
+        <table id="leaderboardTable">
+            <thead>
+                <tr><th>Winner</th><th>Your Score</th><th>Computer Score</th><th>Date</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Fetch leaderboard on load
+    async function loadLeaderboard() {
+        const res = await fetch('/api/leaderboard');
+        const data = await res.json();
+        const tbody = document.querySelector('#leaderboardTable tbody');
+        tbody.innerHTML = '';
+        data.forEach(game => {
+            const row = tbody.insertRow();
+            row.insertCell(0).textContent = game.winner === 'player' ? '👤 You' : '🤖 Computer';
+            row.insertCell(1).textContent = game.player_score;
+            row.insertCell(2).textContent = game.computer_score;
+            row.insertCell(3).textContent = new Date(game.timestamp).toLocaleString();
+        });
+    }
+
+    async function updateGameState() {
+        const res = await fetch('/api/status');
+        const state = await res.json();
+        updateUI(state);
+    }
+
+    function updateUI(state) {
+        document.getElementById('playerScore').textContent = state.player_score;
+        document.getElementById('computerScore').textContent = state.computer_score;
+        document.getElementById('roundPoints').textContent = state.round_points;
+        document.getElementById('message').textContent = state.message;
+
+        const diceValue = state.current_roll;
+        const diceDisplay = document.getElementById('diceDisplay');
+        if (diceValue) {
+            diceDisplay.textContent = getDiceFace(diceValue);
+            diceDisplay.classList.add('rolling');
+            setTimeout(() => diceDisplay.classList.remove('rolling'), 300);
+        } else {
+            diceDisplay.textContent = '🎲';
+        }
+
+        const turnIndicator = document.getElementById('turnIndicator');
+        if (state.game_over) {
+            turnIndicator.textContent = 'Game Over';
+        } else if (state.turn === 'player') {
+            turnIndicator.innerHTML = '🟢 Your turn';
+            turnIndicator.className = 'turn-indicator player-turn';
+        } else {
+            turnIndicator.innerHTML = '🟠 Computer turn';
+            turnIndicator.className = 'turn-indicator computer-turn';
+        }
+
+        if (state.game_over) {
+            document.getElementById('rollBtn').disabled = true;
+            document.getElementById('holdBtn').disabled = true;
+            loadLeaderboard(); // refresh leaderboard after game ends
+        } else {
+            document.getElementById('rollBtn').disabled = false;
+            document.getElementById('holdBtn').disabled = false;
+        }
+    }
+
+    function getDiceFace(value) {
+        const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+        return faces[value-1] || '🎲';
+    }
+
+    async function roll() {
+        const res = await fetch('/api/roll', { method: 'POST' });
+        const state = await res.json();
+        updateUI(state);
+    }
+
+    async function hold() {
+        const res = await fetch('/api/hold', { method: 'POST' });
+        const state = await res.json();
+        updateUI(state);
+    }
+
+    async function newGame() {
+        const res = await fetch('/api/new', { method: 'POST' });
+        const state = await res.json();
+        updateUI(state);
+    }
+
+    document.getElementById('rollBtn').addEventListener('click', roll);
+    document.getElementById('holdBtn').addEventListener('click', hold);
+    document.getElementById('newGameBtn').addEventListener('click', newGame);
+
+    // Initial load
+    updateGameState();
+    loadLeaderboard();
+</script>
 </body>
 </html>
